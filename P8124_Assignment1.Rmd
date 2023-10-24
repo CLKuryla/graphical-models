@@ -2,12 +2,15 @@
 title: "P8124 Assignment 1 Question 5"
 author: "Christine Lucille Kuryla"
 date: "2023-09-19"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ## Problem 5: DAGs and the dagitty library
 
-###Construct DAG
+### Construct DAG
+
 ```{r construct_dag}
 # Problem 5
 
@@ -49,9 +52,10 @@ paths(dag_q5, from = "C", to = "H")
 ```{r b}
 # b) Determine whether E is d-separated from G given A,B
 dseparated(dag_q5, X = "E", Y = "G", Z = c("A", "B"))
-paths(dag_q5, "E", "G", c("A", "B"))
+
+#paths(dag_q5, "E", "G", c("A", "B"))
 ```
-E is NOT d-separated from G given {A,B}.
+E is not d-separated from G conditional on {A,B}.
 
 
 ### c) Conditional independencies
@@ -66,7 +70,7 @@ impliedConditionalIndependencies(dag_q5)
 impliedConditionalIndependencies(dag_q5, type = "all.pairs")
 ```
 
-The two lists are different because XXXXXXXXXXXXXXXX
+The two lists are different because the default is "missing.edge", in which case "one or more minimal testable implication (with the smallest possible conditioning set) is returned per missing edge of the graph", while for "all.pairs", "the function will return a list of all implied conditional independencies between two variables at a time" (according to the documentation under "?impliedConditionalIndependencies"). The first is the minimal set of conditional independencies between two variables at a time, and the second is an exhaustive list.
 
 ### d) Simulation, Markov blanket verification, regression
 
@@ -79,7 +83,7 @@ The two lists are different because XXXXXXXXXXXXXXXX
 sim_sem <- simulateSEM(dag_q5,
             b.lower = -0.7,
             b.upper = 0.7,
-            N = 500)
+            N = 10000)
 
 # Verify Markov blanket property holds for vertex B
 
@@ -90,4 +94,4 @@ markovBlanket(dag_q5, v = "B")
 summary(glm(data = sim_sem, formula = B ~ C + G + A + E + D + F + H))
 ```
 
-We see that the Markov blanket on the DAG G for vertex B is {C, G, A, E}. This is verified by the regression on the vertices such that the p-value for the variables representing the verticies in the Markov blanket (C, G, A, E) all have very small p-values with asterisks indicating as such, while the remaining covariates have larger, non-significant p-values, indicating that XXXXXXXXXXXXX.
+We see that the Markov blanket on the DAG G for vertex B is {C, G, A, E}. This is verified by the regression on the vertices such that the p-value for the variables representing the vertices in the Markov blanket (C, G, A, E) all have very small p-values with asterisks indicating as such, while the remaining covariates have larger, non-significant p-values. This is because the Markov blanket variables are significant (to a reasonable threshold) predictors of B, while the covariates that are not in the blanket have larger p-values because they are conditionally independent of B. 

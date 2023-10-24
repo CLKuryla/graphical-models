@@ -1,0 +1,198 @@
+---
+title: "P8124 Assignment 3"
+author: "Christine Lucille Kuryla (clk2162)"
+date: "2023-10-23"
+output:
+  pdf_document:
+    toc: no
+  html_document:
+    toc: yes
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#     Problem 2
+
+## Simulate data from given MRF independence model
+
+```{r problem_2a}
+
+library(MASS)
+
+# simulate data from a given MRF independence model
+
+set.seed(123)
+( K <- cbind(c(10,7,7,0),c(7,20,0,7),c(7,0,30,7),c(0,7,7,40)) )
+data <- as.data.frame(mvrnorm(n=10000,mu=c(0,0,0,0),Sigma=solve(K)))
+colnames(data) <- c("X1","X2","X3","X4")
+
+# (Note: in R, the inverse of a matrix M is obtained by solve(M).) 
+
+```
+
+
+### Conditional Independencies
+
+*What are the conditional independencies that are representing in this precision matrix?*
+Conditional independencies correspond to the zeros in the precision matrix of the elements given everything else. Hence, for K, the conditional independencies are:
+
+$X_1 \perp X_4 | X_2, X_3$ 
+
+and 
+
+$X_2 \perp X_3 | X_1, X_4$
+
+### Corresponding Graph (INSERT PIC?!?!?!?!)
+*What is the corresponding graph?*
+The corresponding MRF has vertices $X_1, X_2, X_3, X_4$ and edges:  
+
+ - $X_1$ and $X_2$. 
+ 
+ - $X_2$ and $X_4$. 
+ 
+ - $X_4$ and $X_3$. 
+ 
+ - $X_3$ and $X_1$.
+
+### Verify with linear regression
+*Verify the conditional independence constraints by using linear regression.*
+
+```{r q2_regression}
+
+# X1 independent of X4 given X2, X3
+summary(glm(data = data, formula = X1 ~ X4 + X2 + X3))
+
+# X2 independent of X3 given X1, X4
+summary(glm(data = data, formula = X2 ~ X3 + X1 + X4))
+
+```
+
+As demonstrated in the first linear regression, $X_1 \perp X_4 | X_2, X_3$ because we can see that when regressing $X_1$ on $X_4, X_2,X_3$ gives a large p-value for $X_4$ because they are conditionally independent since $X_2$ and $X_3$ are given (note that their small p values demonstrate that they are dependent). The same logic applies to the second regression for $X_2 \perp X_3 | X_1, X_4$ by regressing $X_2$ on the rest of the variables and observing a large p-value for $X_3$, showing independence, because $X_1$ and $X_4$ are conditioned on by putting them in the regression.  
+
+### Explanation
+
+The zeroes in the precision matrix K correspond to the conditional independencies described above. The MRF is the UG with $X_1, X_2, X_3, X_4$ that has the edge between $X_1$ and $X_4$ removed because of the conditional independence $X_1 \perp X_4 | X_2, X_3$ and the edge between $X_2$ and $X_3$ removed because of the conditional independence $X_2 \perp X_3 | X_1, X_4$ that were demonstrated by the zeroes in the precision matrix. The linear regression demonstrates that the conditional independencies are true because when one variable is regressed on the rest, the p-value for the variable that it is conditionally independent of is large (because they are independent), and the p-values of the variables in the conditioning set are small (because they are dependent). 
+
+
+## Estimate precision matrix subject to graph constraints
+```{r problem_2b}
+
+# Use the gRim package to fit the model, i.e., estimate the precision matrix subject to the graph constraints.
+
+library(gRim)
+glist <- list( c("X1","X2"), c("X2","X4"), c("X4","X3"), c("X3","X1") )
+ddd <- cov.wt(data, method="ML")
+fit <- ggmfit(ddd$cov, ddd$n.obs, glist) # Estimate parameters using IPF
+fit$K # estimated precision matrix
+
+# Did it work? How do you know?
+
+```
+
+Yes, it worked. We know this because the estimated precision matrix has the expected zeroes that correspond to the conditional independencies, and in general, it is quite close to K so a good estimation of the actual precision matrix. 
+
+# Problem 3
+
+```{r problem_3}
+
+# Consider the Gaussian Bayesian Network model with the following covariance matrix:
+
+set.seed(123)
+( Sig <- cbind(c(3,-1.4,0,0),c(-1.4,3,1.4,1.4),c(0,1.4,3,0),c(0,1.4,0,3)) )
+data <- as.data.frame(mvrnorm(n=10000,mu=c(0,0,0,0),Sigma=Sig))
+colnames(data) <- c("X1","X2","X3","X4")
+cor(data)
+# above are marginal correlatoons
+# and the DAG G with edges X1 → X2 ← X3 and X4 → X2.
+
+# a) What correlation constraints does this model represent? Estimate the correlation matrix.
+# b) Consider also the moralized graph Gm and what the corresponding precision matrix K would look like. What are the partial correlation constraints represented in K? How does this make sense with respect to sigma above?
+# c) Following steps similar to the previous problem, estimate the corresponding precision matrix K from this data (using ggmfit). Take the inverse and compare to the true covariance matrix.
+
+
+glist <- list( c("X1","X2"), c("X2","X3"), c("X4","X2")  )
+ddd <- cov.wt(data, method="ML")
+fit <- ggmfit(ddd$cov, ddd$n.obs, glist) # Estimate parameters using IPF
+fit$K # estimated precision matrix
+
+solve(fit$K) # inverse of K (covariance matrix)
+
+```
+
+# Problem 4
+
+```{r problem_4}
+
+library(dagitty)
+
+#Use dagitty to simulate 10000 observations from this graph:
+g <- dagitty( "dag{ x <- u1; u1 -> m <- u2 ; u2 -> y }" )
+
+sim_sem <- simulateSEM(g,
+     #       b.lower = -0.7,
+      #      b.upper = 0.7,
+            N = 10000)
+
+# Here U1,U2 represent unmeasured variables. 
+
+# Estimate the effect of X on Y adjusting for M in a linear regression, obtaining a 95% confidence interval for the effect. 
+
+summary(glm(data = sim_sem, formula = y ~ x + m ))
+lm=lm(data = sim_sem, formula = y ~ x + m )
+library(broom)
+tidy(lm, conf.int=TRUE)
+############# what is effect?95% ci?
+
+# Then estimate the same effect (and confidence interval) using the correct sufficient adjustment set that you can obtain from dagitty. 
+##### HOW?
+
+
+# What conclusion should be drawn from this example?
+
+```
+
+# Problem 5
+
+```{r problem_5}
+
+# Construct the DAG in Figure 1 as a daggity object. 
+
+dag_q5 <- dagitty('dag {
+    D [pos="0,1"]
+    E [pos="1,1"]
+    A [pos="2,1"]
+    B [pos="3,1"]
+    F [pos="4,1"]
+    C [pos="1,0"]
+    G [pos="4,0"]
+    H [pos="5,0"]
+
+    D -> E -> A <- B <- G -> H
+    E -> F -> H
+    E <- C -> H
+    C -> B
+    C -> F -> G
+
+}')
+
+plot(dag_q5)
+
+# Simulate 10000 observations from this graph using simulateSEM() as you did on the first homework.
+
+sim_sem <- simulateSEM(dag_q5,
+            b.lower = -0.7,
+            b.upper = 0.7,
+            N = 10000)
+
+# Estimate the effect of E on F and the effect of B on A using backdoor adjustment and linear regression.
+# ???????????????????????
+
+# If there is more than one sufficient adjustment set, try each of the ones identified by dagitty and compare them. 
+
+# Are the point estimates similar? Do the estimates have similar variance (or confidence interval length)? Compare also these estimates against an approach which simply adjusts for all other variables in the graph. How are the results different (if they are) and what is the explanation?
+
+```
+
