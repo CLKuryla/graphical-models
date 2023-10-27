@@ -12,6 +12,9 @@ output:
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(knitr)
+library(tidyverse)
+library(broom)
 ```
 
 #     Problem 2
@@ -49,13 +52,13 @@ $X_2 \perp X_3 | X_1, X_4$
 *What is the corresponding graph?*
 The corresponding MRF has vertices $X_1, X_2, X_3, X_4$ and edges:  
 
- - $X_1$ and $X_2$. 
+ - $X_1 - X_2$. 
  
- - $X_2$ and $X_4$. 
+ - $X_2 - X_4$. 
  
- - $X_4$ and $X_3$. 
+ - $X_4 - X_3$. 
  
- - $X_3$ and $X_1$.
+ - $X_3 - X_1$.
 
 ### Verify with linear regression
 *Verify the conditional independence constraints by using linear regression.*
@@ -90,28 +93,57 @@ fit$K # estimated precision matrix
 
 # Did it work? How do you know?
 
+# Precision matrix (K)
+kable(K)
+
+# Estimated precision matrix 
+kable(fit$K)
+
 ```
 
-Yes, it worked. We know this because the estimated precision matrix has the expected zeroes that correspond to the conditional independencies, and in general, it is quite close to K so a good estimation of the actual precision matrix. 
+Yes, it worked. We know this because the estimated precision matrix has the expected zeroes that correspond to the conditional independencies, and in general, the values are quite close to K so a good estimation of the actual precision matrix. 
 
 # Problem 3
 
-```{r problem_3}
+Consider the Gaussian Bayesian Network model with the following covariance matrix:
+and the DAG G with edges X1 → X2 ← X3 and X4 → X2.
 
-# Consider the Gaussian Bayesian Network model with the following covariance matrix:
+## a) Correlation constraints and correlation matrix
+* a) What correlation constraints does this model represent? Estimate the correlation matrix. *
+This model represents three marginal independencies (six correlations shown by the 0s). 
+
+- $X_4 \perp X_3$ ($X_4$ is marginally independent of $X_3$, so the correlation between $X_4$ and $X_3$ = 0). Correlations are symmetric, so $corr(X_3, X_4) = corr(X_4, X_3) = 0$.
+
+- $X_1 \perp X_3$ ($X_1$ is marginally independent of $X_3$, so the correlation between $X_1$ and $X_3$ = 0). Correlations are symmetric, so $corr(X_3, X_1) = corr(X_1, X_3) = 0$.
+
+- $X_1 \perp X_4$ ($X_1$ is marginally independent of $X_4$, so the correlation between $X_1$ and $X_4$ = 0). Correlations are symmetric, so $corr(X_4, X_1) = corr(X_1, X_4) = 0$.
+
+```{r problem_3_corr_matrix}
 
 set.seed(123)
 ( Sig <- cbind(c(3,-1.4,0,0),c(-1.4,3,1.4,1.4),c(0,1.4,3,0),c(0,1.4,0,3)) )
 data <- as.data.frame(mvrnorm(n=10000,mu=c(0,0,0,0),Sigma=Sig))
 colnames(data) <- c("X1","X2","X3","X4")
-cor(data)
-# above are marginal correlatoons
-# and the DAG G with edges X1 → X2 ← X3 and X4 → X2.
 
-# a) What correlation constraints does this model represent? Estimate the correlation matrix.
-# b) Consider also the moralized graph Gm and what the corresponding precision matrix K would look like. What are the partial correlation constraints represented in K? How does this make sense with respect to sigma above?
-# c) Following steps similar to the previous problem, estimate the corresponding precision matrix K from this data (using ggmfit). Take the inverse and compare to the true covariance matrix.
+# Estimate correlation matrix
+sigma_est <- cor(data)
 
+kable(sigma_est)
+
+```
+
+
+## b) The moralized graph
+* b) Consider also the moralized graph Gm and what the corresponding precision matrix K would look like. What are the partial correlation constraints represented in K? How does this make sense with respect to sigma above? *
+
+- The moralized Graph Gm would be the complete graph formed from the skeleton of G. It is the graph formed by making the edges in G undirected and adding edges $X_1 - X_4$, $X_4 - X_3$, and $X_3 - X_1$ because $X_2$ is an unshielded collider so it's parents are married during the moralization process. 
+- There are no partial correlation constraints represented in K because there are no missing edges in Gm. XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+- This makes sense wrt the correlation matrix Sigma above because there are marginal independencies but no conditional independencies. XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+## c) Estimate K, take inverse, and compare to true Sigma
+* c) Following steps similar to the previous problem, estimate the corresponding precision matrix K from this data (using ggmfit). Take the inverse and compare to the true covariance matrix. *
+
+```{r problem_3_c}
 
 glist <- list( c("X1","X2"), c("X2","X3"), c("X4","X2")  )
 ddd <- cov.wt(data, method="ML")
@@ -120,39 +152,66 @@ fit$K # estimated precision matrix
 
 solve(fit$K) # inverse of K (covariance matrix)
 
+# True covariance matrix
+Sig
+
 ```
+
+The estimates for the non-zero entries in the covariance matrix are similar numbers to the true covariance matrix (close to -1.4, 1.4, -3, 3, but not exact because it's an estimation from simulated data). However, there are very non-zero values in place of the true zeroes, because during the moralization process, three edges were added because of the unshielded colliders. This is a demonstration of why going from a moralized, undirected graph Gm to a DAG is not a reliable way to completely determine the structure of the original DAG G. 
 
 # Problem 4
 
+## Simulate graph
 ```{r problem_4}
-
 library(dagitty)
 
 #Use dagitty to simulate 10000 observations from this graph:
 g <- dagitty( "dag{ x <- u1; u1 -> m <- u2 ; u2 -> y }" )
 
 sim_sem <- simulateSEM(g,
-     #       b.lower = -0.7,
-      #      b.upper = 0.7,
+            b.lower = 0.4,
+            b.upper = 0.7,
             N = 10000)
 
-# Here U1,U2 represent unmeasured variables. 
+# Here U1,U2 represent unmeasured variables.
+```
 
+## Estimate effects of X on Y
+
+*Estimate the effect of X on Y adjusting for M in a linear regression, obtaining a 95% confidence interval for the effect.*
+```{r problem_4b}
 # Estimate the effect of X on Y adjusting for M in a linear regression, obtaining a 95% confidence interval for the effect. 
 
-summary(glm(data = sim_sem, formula = y ~ x + m ))
-lm=lm(data = sim_sem, formula = y ~ x + m )
+lm_m = lm(data = sim_sem, formula = y ~ x + m )
+summary(lm_m)
 library(broom)
-tidy(lm, conf.int=TRUE)
-############# what is effect?95% ci?
+tidy_ci_m <- tidy(lm_m, conf.int=TRUE)
+tidy_ci_m
+```
 
+
+
+* Then estimate the same effect (and confidence interval) using the correct sufficient adjustment set that you can obtain from dagitty.*
+```{r problem_4c}
 # Then estimate the same effect (and confidence interval) using the correct sufficient adjustment set that you can obtain from dagitty. 
+
+# Sufficient adjustment set
+adjustmentSets(g, "y", "x", type = "minimal")
+# This results in an empty set. 
+
+
 ##### HOW?
 
 
 # What conclusion should be drawn from this example?
 
 ```
+
+The estimate of the effect of X on Y adjusting for M in a linear regression is `r tidy_ci_m$estimate[2]`, with a confidence interval (`r tidy_ci_m$conf.low[2]`, `r tidy_ci_m$conf.high[2]`). 
+
+The sufficient adjus
+
+The estimate
 
 # Problem 5
 
@@ -189,6 +248,14 @@ sim_sem <- simulateSEM(dag_q5,
 
 # Estimate the effect of E on F and the effect of B on A using backdoor adjustment and linear regression.
 # ???????????????????????
+
+# Effect of E on F 
+adjustmentSets(dag_q5, "E", "F", type = "minimal")
+# Result: { C }
+
+# Effect of B on A 
+adjustmentSets(dag_q5, "B", "A", type = "minimal")
+# Result: { E }, { C, F }, { C, G }
 
 # If there is more than one sufficient adjustment set, try each of the ones identified by dagitty and compare them. 
 
