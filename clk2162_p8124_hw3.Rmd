@@ -189,7 +189,7 @@ tidy_ci_m <- tidy(lm_m, conf.int=TRUE)
 tidy_ci_m
 ```
 
-
+The estimated effect of X on Y, adjusting for M, is `r tidy_ci_m$estimate[2]`, with a 95% confidence interval of (tidy_ci_m$conf.low[2], tidy_ci_m$conf.high[2]). 
 
 * Then estimate the same effect (and confidence interval) using the correct sufficient adjustment set that you can obtain from dagitty.*
 ```{r problem_4c}
@@ -199,24 +199,24 @@ tidy_ci_m
 adjustmentSets(g, "y", "x", type = "minimal")
 # This results in an empty set. 
 
-
-##### HOW?
-
-
-# What conclusion should be drawn from this example?
+lm_sufficient = lm(data = sim_sem, formula = y ~ x )
+summary(lm_sufficient)
+tidy_ci_sufficient <- tidy(lm_sufficient, conf.int=TRUE)
+tidy_ci_sufficient
 
 ```
 
-The estimate of the effect of X on Y adjusting for M in a linear regression is `r tidy_ci_m$estimate[2]`, with a confidence interval (`r tidy_ci_m$conf.low[2]`, `r tidy_ci_m$conf.high[2]`). 
+The estimate of the effect of X on Y adjusting for M in a linear regression is `r tidy_ci_m$estimate[2]`, with a confidence interval (`r tidy_ci_m$conf.low[2]`, `r tidy_ci_m$conf.high[2]`). This does not cross zero and implies an association. 
 
-The sufficient adjus
+The estimate of the effect of X on Y adjusting for nothing (the sufficient set from daggity was the empty set) in a linear regression is `r tidy_ci_sufficient$estimate[2]`, with a confidence interval (`r tidy_ci_sufficient$conf.low[2]`, `r tidy_ci_sufficient$conf.high[2]`). This crosses zero and does not imply an association. 
 
-The estimate
+From this example, we can conclude that adjusting for M induced an association that was not actually there. This is an example of the M bias, or the butterfly bias, where a d-connection is induced by conditioning on the wrong thing, so it results in a bias/association that isn't actually there. We can see this from the underlying data that we simulated from a known DAG. 
 
 # Problem 5
 
-```{r problem_5}
+## Construct DAG in dagitty and simulate 10000 observations
 
+```{r problem_5}
 # Construct the DAG in Figure 1 as a daggity object. 
 
 dag_q5 <- dagitty('dag {
@@ -244,14 +244,84 @@ plot(dag_q5)
 sim_sem <- simulateSEM(dag_q5,
             b.lower = -0.7,
             b.upper = 0.7,
-            N = 10000)
+            N = 100000)
+```
 
+## Estimate the effect of E on F with linear regression and different adjustments
+
+Note that the result from dagitty for the minimal adjustment set is just one: { C }. In order to estimate the effect of E on F, we will regress F on E and adjust for C, as well as regressing it on everything, and compare the results. 
+
+```{r problem_5a}
 # Estimate the effect of E on F and the effect of B on A using backdoor adjustment and linear regression.
-# ???????????????????????
 
 # Effect of E on F 
+
 adjustmentSets(dag_q5, "E", "F", type = "minimal")
 # Result: { C }
+
+# Linear regression of F on E, adjusting for C
+lm_ef_adj_c = lm(data = sim_sem, formula = F ~ E + C )
+summary(lm_ef_adj_c)
+tidy_ef_adj_c <- tidy(lm_ef_adj_c, conf.int=TRUE)
+tidy_ef_adj_c
+
+# Linear regression of F on everything
+lm_f = lm(data = sim_sem, formula = F ~ E + C + A + B + D + G + H)
+summary(lm_f)
+tidy_f <- tidy(lm_f, conf.int=TRUE)
+tidy_f
+
+# Linear regression of F on E, with no adjustments
+lm_ef_adj_0 = lm(data = sim_sem, formula = F ~ E)
+summary(lm_ef_adj_0)
+tidy_ef_adj_0 <- tidy(lm_ef_adj_0, conf.int=TRUE)
+tidy_ef_adj_0
+
+# Table of results
+
+ef_adj_c <- c (tidy_ef_adj_c$term[2],
+             tidy_ef_adj_c$estimate[2],
+             tidy_ef_adj_c$std.error[2],
+             tidy_ef_adj_c$conf.low[2],
+             tidy_ef_adj_c$conf.high[2],
+             (tidy_ef_adj_c$conf.high[2] - tidy_ef_adj_c$conf.low[2])
+                )
+ef_adj_all <- c (tidy_f$term[2],
+             tidy_f$estimate[2],
+             tidy_f$std.error[2],
+             tidy_f$conf.low[2],
+             tidy_f$conf.high[2],
+             (tidy_f$conf.high[2] - tidy_f$conf.low[2])
+                )
+
+ef_adj_0 <- c (tidy_ef_adj_0$term[2],
+             tidy_ef_adj_0$estimate[2],
+             tidy_ef_adj_0$std.error[2],
+             tidy_ef_adj_0$conf.low[2],
+             tidy_ef_adj_0$conf.high[2],
+             (tidy_ef_adj_0$conf.high[2] - tidy_ef_adj_0$conf.low[2])
+                )
+
+table_ef <- rbind(ef_adj_c, ef_adj_all, ef_adj_0)
+
+colnames(table_ef) <- c("Var", "Estimate", "SE", "CI low", "CI high", "CI length")
+
+kable(table_ef)
+
+```
+
+
+The estimate of the effect of E on F adjusting for C in a linear regression is `r tidy_ef_adj_c$estimate[2]`, with a confidence interval (`r tidy_ef_adj_c$conf.low[2]`, `r tidy_ef_adj_c$conf.high[2]`). The standard error is `r tidy_ef_adj_c$std.error[2]`. The CI length is `r tidy_ef_adj_c$conf.high[2] - tidy_ef_adj_c$conf.low[2]`.
+
+The estimate of the effect of E on F adjusting for all of the variables in a linear regression is `r tidy_f$estimate[2]`, with a confidence interval (`r tidy_f$conf.low[2]`, `r tidy_f$conf.high[2]`). The standard error is `r tidy_f$std.error[2]`. The CI length is `r tidy_f$conf.high[2] - tidy_f$conf.low[2]`.
+
+The estimate of the effect of E on F adjusting for none of the variables in a linear regression is `r tidy_f$estimate[2]`, with a confidence interval (`r tidy_f$conf.low[2]`, `r tidy_f$conf.high[2]`). The standard error is `r tidy_f$std.error[2]`. The CI length is `r tidy_f$conf.high[2] - tidy_f$conf.low[2]`.
+
+## Estimate the effect of B on A with linear regression and different adjustments
+
+Note that the result from dagitty for the minimal adjustment sets are { E }, { C, F }, { C, G }. In order to estimate the effect of B on A, we will regress A on B and adjust for the sufficient sets, as well as regressing it on everything, and compare the results. 
+
+```{r problem_5b}
 
 # Effect of B on A 
 adjustmentSets(dag_q5, "B", "A", type = "minimal")
@@ -259,7 +329,103 @@ adjustmentSets(dag_q5, "B", "A", type = "minimal")
 
 # If there is more than one sufficient adjustment set, try each of the ones identified by dagitty and compare them. 
 
-# Are the point estimates similar? Do the estimates have similar variance (or confidence interval length)? Compare also these estimates against an approach which simply adjusts for all other variables in the graph. How are the results different (if they are) and what is the explanation?
+
+# Linear regression of A on B, adjusting for E
+lm_ab_adj_e = lm(data = sim_sem, formula = A ~ B + E )
+summary(lm_ab_adj_e)
+tidy_ab_adj_e <- tidy(lm_ab_adj_e, conf.int=TRUE)
+tidy_ab_adj_e
+
+# Linear regression of A on B, adjusting for C and F
+lm_ab_adj_cf = lm(data = sim_sem, formula = A ~ B + C + F )
+summary(lm_ab_adj_cf)
+tidy_ab_adj_cf <- tidy(lm_ab_adj_cf, conf.int=TRUE)
+tidy_ab_adj_cf
+
+# Linear regression of A on B, adjusting for C and G
+lm_ab_adj_cg = lm(data = sim_sem, formula = A ~ B + C + G )
+summary(lm_ab_adj_cg)
+tidy_ab_adj_cg <- tidy(lm_ab_adj_cg, conf.int=TRUE)
+tidy_ab_adj_cg
+
+# Linear regression of A on B, adjusting for all variables
+lm_ab_adj_all = lm(data = sim_sem, formula = A ~ B + C + D + E + F + G + H )
+summary(lm_ab_adj_all)
+tidy_ab_adj_all <- tidy(lm_ab_adj_all, conf.int=TRUE)
+tidy_ab_adj_all
+
+# Linear regression of A on B, adjusting for nothing
+lm_ab_adj_0 = lm(data = sim_sem, formula = A ~ B )
+summary(lm_ab_adj_0)
+tidy_ab_adj_0 <- tidy(lm_ab_adj_0, conf.int=TRUE)
+tidy_ab_adj_0
+
+# Table of results
+
+ab_adj_e <- c (tidy_ab_adj_e$term[2],
+             tidy_ab_adj_e$estimate[2],
+             tidy_ab_adj_e$std.error[2],
+             tidy_ab_adj_e$conf.low[2],
+             tidy_ab_adj_e$conf.high[2],
+             (tidy_ab_adj_e$conf.high[2] - tidy_ab_adj_e$conf.low[2])
+                )
+ab_adj_cf <- c (tidy_ab_adj_cf$term[2],
+             tidy_ab_adj_cf$estimate[2],
+             tidy_ab_adj_cf$std.error[2],
+             tidy_ab_adj_cf$conf.low[2],
+             tidy_ab_adj_cf$conf.high[2],
+             (tidy_ab_adj_cf$conf.high[2] - tidy_ab_adj_cf$conf.low[2])
+                )
+
+ab_adj_cg <- c (tidy_ab_adj_cg$term[2],
+             tidy_ab_adj_cg$estimate[2],
+             tidy_ab_adj_cg$std.error[2],
+             tidy_ab_adj_cg$conf.low[2],
+             tidy_ab_adj_cg$conf.high[2],
+             (tidy_ab_adj_cg$conf.high[2] - tidy_ab_adj_cg$conf.low[2])
+                )
+
+ab_adj_all <- c (tidy_ab_adj_all$term[2],
+             tidy_ab_adj_all$estimate[2],
+             tidy_ab_adj_all$std.error[2],
+             tidy_ab_adj_all$conf.low[2],
+             tidy_ab_adj_all$conf.high[2],
+             (tidy_ab_adj_all$conf.high[2] - tidy_ab_adj_all$conf.low[2])
+                )
+
+ab_adj_0 <- c (tidy_ab_adj_0$term[2],
+             tidy_ab_adj_0$estimate[2],
+             tidy_ab_adj_0$std.error[2],
+             tidy_ab_adj_0$conf.low[2],
+             tidy_ab_adj_0$conf.high[2],
+             (tidy_ab_adj_0$conf.high[2] - tidy_ab_adj_0$conf.low[2])
+                )
+
+table_ab <- rbind(ab_adj_e, ab_adj_cf, ab_adj_cg, ab_adj_all, ab_adj_0)
+
+colnames(table_ab) <- c("Var", "Estimate", "SE", "CI low", "CI high", "CI length")
+
+kable(table_ab)
+
+
+# Are the point estimates similar? 
+# Do the estimates have similar variance (or confidence interval length)? 
+# Compare also these estimates against an approach which simply adjusts for all other variables in the graph. 
+# How are the results different (if they are) and what is the explanation?
 
 ```
 
+
+
+`r kable(table_ef[,c(2,3,4,5)])`
+`r kable(table_ab[,c(2,3,4,5)])`
+
+Summary:
+
+`r kable(table_ef[,c(2,3,6)])`
+When exploring the effect of E on F, there was only one set of sufficient adjustment variables from dagitty. Compared to the model with all of the variables in the equation, the point estimates are not similar and the confidence intervals do not usually overlap. The point estimates also have relatively different variance (and CI length). Compared to the unadjusted model, the point estimates are different but the unadjusted variances/CI lengths are lower. 
+
+`r kable(table_ab[,c(2,3,6)])`
+For the effect of B on A, the point estimates are very similar for all three minimally sufficient sets, as are the variances (or confidence interval lengths). Additionally, they are all similar to the regression where all of the variables were adjusted for in the model. It seems that the sufficient adjustment sets do indeed sufficiently adjust as needed. Compared to the unadjusted model, the point estimates are different when no adjustment is performed, but the variances/CI lengths are similar. 
+
+When comparing the results of the different adjustments for the effect of E on F versus the effect of B on A, we see that adjusting for all of the variables in the E on F model causes the effect estimate to change much more than for the model looking at the effect of B on A, and the variances/CI lengths are markedly different for E on F as well as compared to those of the B on A. Both models have different point estimates when adjusted. 
