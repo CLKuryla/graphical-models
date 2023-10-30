@@ -62,6 +62,8 @@ K_{S, A} & K_{S, S}\\
 
 Recall that $A := \{X_i, X_j\}$. This means that the i-th, j-th elements of this matrix must be zeroes, hence $[\Sigma_{\{AS\}\{AS\}}^{-1}]_{i,j}$ = 0, as desired.
 
+One may also begin by assuming that $[\Sigma_{\{AS\}\{AS\}}^{-1}]_{i,j}$ = 0, and following similar logic and relationships, show that $X_i \perp \!\!\! \perp X_j | X_S$. 
+
 
 #     Problem 2
 
@@ -291,7 +293,7 @@ plot(dag_q5)
 sim_sem <- simulateSEM(dag_q5,
             b.lower = -0.7,
             b.upper = 0.7,
-            N = 100000)
+            N = 10000)
 ```
 
 ## Estimate the effect of E on F with linear regression and different adjustments
@@ -464,15 +466,14 @@ kable(table_ab)
 
 
 
+## Summary:
+
 `r kable(table_ef[,c(2,3,4,5)])`
-`r kable(table_ab[,c(2,3,4,5)])`
-
-Summary:
-
 `r kable(table_ef[,c(2,3,6)])`
 When exploring the effect of E on F, there was only one set of sufficient adjustment variables from dagitty. Compared to the model with all of the variables in the equation, the point estimates are not similar and the confidence intervals do not usually overlap. The point estimates also have relatively different variance (and CI length). Compared to the unadjusted model, the point estimates are different but the unadjusted variances/CI lengths are lower. 
 
+`r kable(table_ab[,c(2,3,4,5)])`
 `r kable(table_ab[,c(2,3,6)])`
-For the effect of B on A, the point estimates are very similar for all three minimally sufficient sets, as are the variances (or confidence interval lengths). Additionally, they are all similar to the regression where all of the variables were adjusted for in the model. It seems that the sufficient adjustment sets do indeed sufficiently adjust as needed. Compared to the unadjusted model, the point estimates are different when no adjustment is performed, but the variances/CI lengths are similar. 
+For the effect of B on A, the point estimates are very similar for all three minimally sufficient sets, as are the variances (or confidence interval lengths). Additionally, they are all similar to the regression where all of the variables were adjusted for in the model. It seems that the sufficient adjustment sets do indeed sufficiently adjust as needed. Compared to the unadjusted model, the point estimates are different when no adjustment is performed, but the variances/CI lengths are similar. Usually, in the adjusted models, the CI for the estimate crosses zero, while it does not for the unadjusted. 
 
-When comparing the results of the different adjustments for the effect of E on F versus the effect of B on A, we see that adjusting for all of the variables in the E on F model causes the effect estimate to change much more than for the model looking at the effect of B on A, and the variances/CI lengths are markedly different for E on F as well as compared to those of the B on A. Both models have different point estimates when adjusted. This makes sense, because adjusting for appropriate variables should change the result (make it more accurate). 
+When comparing the results of the different adjustments for the effect of E on F versus the effect of B on A, we see that adjusting for all of the variables in the E on F model causes the effect estimate to change much more than for the model looking at the effect of B on A, and the variances/CI lengths are markedly different for E on F as well as compared to those of the B on A. Both models have different point estimates when adjusted. This makes sense, because adjusting for appropriate variables should change the result (make it more accurate). When and when not adjusted, the first model (E on F) shows an effect. When not adjusted, the second model (B on A) shows an effect, but when adjusted, the CI crosses zero, which does not suggest an effect. 
